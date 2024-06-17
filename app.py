@@ -1,44 +1,46 @@
-# app.py
-from flask import Flask, jsonify
+from flask import Flask
 import mysql.connector
 import time
-from config import DB_CONFIG
+from prometheus_client import start_http_server, Summary
+from prometheus_client import Counter, generate_latest
 
 app = Flask(__name__)
 
+# Create a metric to track time spent and requests made
+REQUEST_TIME = Summary('request_processing_seconds', 'Time spent processing request')
+REQUEST_COUNTER = Counter('request_processing_count', 'Number of requests processed')
+
+@app.route('/metrics')
+def metrics():
+    return generate_latest()
+
+def get_db_connection():
+    connection = mysql.connector.connect(
+        host='localhost',
+        user='root',
+        password='root',
+        database='my_db'
+    )
+    return connection
+
+@REQUEST_TIME.time()
 @app.route('/')
-def query_latency():
-    try:
-        # Connect to the MySQL database
-        conn = mysql.connector.connect(**DB_CONFIG)
-        cursor = conn.cursor()
-
-        # Start timing
-        start_time = time.time()
-
-        # Execute the query
-        cursor.execute("SELECT * FROM users")
-
-        # Fetch the results (optional, depending on what you want to measure)
-        results = cursor.fetchall()
-
-        # End timing
-        end_time = time.time()
-
-        # Calculate latency
-        latency = end_time - start_time
-
-        # Close the cursor and connection
-        cursor.close()
-        conn.close()
-
-        return jsonify({
-            'latency': latency,
-            'results': results  # You can remove this if you don't want to return the results
-        })
-
-    except mysql.connector.Error as err:
-        return jsonify({'error': str(err)}), 500
+def query():
+    start_time = time.time()
+    REQUEST_COUNTER.inc()
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM users")
+    result = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    end_time = time.time()
+    latency = end_time - start_time
+    REQUEST_TIME.observe(latency)
+    return f"Query latency: {latency} seconds. Result: {result}"
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Start up the server to expose the metrics.
+    start_http_server(8000)
+    # Run the Flask app
+    app.run(port=5000)
