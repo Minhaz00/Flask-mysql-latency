@@ -258,9 +258,9 @@ scrape_configs:
 
 Expected results:
 
-![alt text](<./img1.jpg>)
+![alt text](<./img/img1.jpg>)
 
-![alt text](<./img2.jpg>)
+![alt text](<./img/img2.jpg>)
 
 
 By following these steps, you will have a fully functioning monitoring setup for the latency of MySQL queries in a Flask application using Prometheus and Grafana without using Docker containers.
